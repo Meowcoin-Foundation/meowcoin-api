@@ -1,0 +1,67 @@
+[Unit]
+Description=Meowcoin API Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=NODE_ENV=production
+WorkingDirectory=/srv/meowapi
+
+# Run Node explicitly with full path
+ExecStart=/usr/bin/env node server.js
+
+# Restart on crash or error
+Restart=always
+RestartSec=3
+
+# The service user
+User=www-data
+Group=www-data
+
+# Logging (systemd manages rotation safely)
+StandardOutput=append:/srv/meowapi/logs/api.log
+StandardError=append:/srv/meowapi/logs/error.log
+
+# ---- Security Hardening ----
+
+# Prevent privilege escalation
+NoNewPrivileges=true
+
+# Private /tmp and /var/tmp
+PrivateTmp=true
+
+# Restrict filesystem access
+ProtectSystem=full
+ProtectHome=true
+
+# Allow app to write logs only
+ReadWritePaths=/srv/meowapi/logs
+
+# Restrict network namespace separation
+PrivateDevices=true
+ProtectHostname=true
+ProtectClock=true
+
+# Do not allow the process to modify kernel settings
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+
+# Lock down capabilities (Node needs none)
+CapabilityBoundingSet=
+
+# Ensure the service cannot gain capabilities
+AmbientCapabilities=
+
+# Memory security
+MemoryDenyWriteExecute=true
+
+# Restrict system bus access
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# OOM protection
+OOMPolicy=restart
+
+[Install]
+WantedBy=multi-user.target
