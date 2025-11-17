@@ -55,7 +55,7 @@ CapabilityBoundingSet=
 AmbientCapabilities=
 
 # Memory security
-MemoryDenyWriteExecute=true
+# MemoryDenyWriteExecute=true
 
 # Restrict system bus access
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
