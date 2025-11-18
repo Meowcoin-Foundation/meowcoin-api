@@ -79,6 +79,28 @@ Static reward percentages used for all blocks.
 
 ---
 
+### **GET `/mining-info`**
+
+Returns mining information including block height, difficulty, and network hash rate for both MeowPow and Scrypt algorithms.
+
+**Example Response**
+
+```json
+{
+  "block_height": 1672942,
+  "meowpow": {
+    "difficulty": 1234.567,
+    "hashrate": 1234567890.123
+  },
+  "scrypt": {
+    "difficulty": 5678.901,
+    "hashrate": 9876543210.987
+  }
+}
+```
+
+---
+
 ### **GET `/health`**
 
 Returns API health status.

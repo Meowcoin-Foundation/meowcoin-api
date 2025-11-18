@@ -211,6 +211,48 @@ app.get("/reward-breakdown", async (req, res) => {
 });
 
 /**
+ * GET /mining-info
+ * Returns mining information for both algorithms (MeowPow and Scrypt)
+ */
+app.get("/mining-info", async (req, res) => {
+  try {
+    const data = await cachedFetch("mining_info", async () => {
+      // Get block height
+      const blockHeight = await rpc("getblockcount");
+      
+      // Get difficulty for both algorithms
+      const meowpowDifficulty = await rpc("getdifficulty 0");
+      const scryptDifficulty = await rpc("getdifficulty 1");
+      
+      // Get network hash rate for both algorithms
+      // getnetworkhashps nblocks height algo
+      const meowpowHashrate = await rpc("getnetworkhashps 0 -1 0");
+      const scryptHashrate = await rpc("getnetworkhashps 0 -1 1");
+
+      return {
+        block_height: blockHeight,
+        meowpow: {
+          difficulty: meowpowDifficulty,
+          hashrate: meowpowHashrate
+        },
+        scrypt: {
+          difficulty: scryptDifficulty,
+          hashrate: scryptHashrate
+        }
+      };
+    });
+
+    res.json(data);
+  } catch (err) {
+    log(`Error in /mining-info: ${err.message}`, "error");
+    res.status(503).json({ 
+      error: "Service temporarily unavailable",
+      message: "Unable to fetch mining information"
+    });
+  }
+});
+
+/**
  * GET /health
  * Health check endpoint
  */
