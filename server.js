@@ -211,11 +211,94 @@ app.get("/reward-breakdown", async (req, res) => {
 });
 
 /**
+ * Detect algorithm from block version using bitmasking
+ * @param {number} version - Block version number
+ * @returns {string} "meowpow", "scrypt", or "unknown"
+ */
+function detectAlgo(version) {
+  const MASK = 0xFFFFFF00;
+  const MPW = 0x30090000; // MeowPow
+  const SCR = 0x30090100; // Scrypt
+  
+  if ((version & MASK) === MPW) return "meowpow";
+  if ((version & MASK) === SCR) return "scrypt";
+  return "unknown";
+}
+
+/**
+ * Calculate average block time and block counts per algorithm
+ * @param {Array} blocks - Array of block objects with time and version
+ * @param {number} windowMinutes - Time window in minutes
+ * @returns {Object} Statistics per algorithm
+ */
+function calculateBlockStats(blocks, windowMinutes) {
+  const now = Math.floor(Date.now() / 1000);
+  const windowSeconds = windowMinutes * 60;
+  
+  // Filter blocks within time window
+  const windowBlocks = blocks.filter(b => 
+    b.time && (now - b.time) <= windowSeconds
+  );
+  
+  // Separate blocks by algorithm
+  const meowpowBlocks = [];
+  const scryptBlocks = [];
+  
+  windowBlocks.forEach(block => {
+    const algo = detectAlgo(block.version);
+    if (algo === "meowpow") {
+      meowpowBlocks.push(block);
+    } else if (algo === "scrypt") {
+      scryptBlocks.push(block);
+    }
+  });
+  
+  // Sort by time (oldest first)
+  meowpowBlocks.sort((a, b) => a.time - b.time);
+  scryptBlocks.sort((a, b) => a.time - b.time);
+  
+  // Calculate average block time per algorithm
+  function calculateAvgBlockTime(algoBlocks) {
+    if (algoBlocks.length < 2) return null;
+    
+    const spacings = [];
+    for (let i = 1; i < algoBlocks.length; i++) {
+      const spacing = algoBlocks[i].time - algoBlocks[i - 1].time;
+      // Filter out unreasonable values (0 to 1 hour)
+      if (spacing > 0 && spacing <= 3600) {
+        spacings.push(spacing);
+      }
+    }
+    
+    if (spacings.length === 0) return null;
+    return spacings.reduce((a, b) => a + b, 0) / spacings.length;
+  }
+  
+  const meowpowAvgTime = calculateAvgBlockTime(meowpowBlocks);
+  const scryptAvgTime = calculateAvgBlockTime(scryptBlocks);
+  
+  return {
+    meowpow: {
+      blocks_found: meowpowBlocks.length,
+      avg_block_time: meowpowAvgTime ? Math.round(meowpowAvgTime) : null
+    },
+    scrypt: {
+      blocks_found: scryptBlocks.length,
+      avg_block_time: scryptAvgTime ? Math.round(scryptAvgTime) : null
+    }
+  };
+}
+
+/**
  * GET /mining-info
  * Returns mining information for both algorithms (MeowPow and Scrypt)
+ * Analyzes blocks from the last 60 minutes
  */
 app.get("/mining-info", async (req, res) => {
   try {
+    const windowMinutes = 60;
+    const blocksToFetch = 576; // ~1 min blocks, covers 60 min window
+    
     const data = await cachedFetch("mining_info", async () => {
       // Get block height
       const blockHeight = await rpc("getblockcount");
@@ -225,19 +308,48 @@ app.get("/mining-info", async (req, res) => {
       const scryptDifficulty = await rpc("getdifficulty 1");
       
       // Get network hash rate for both algorithms
-      // getnetworkhashps nblocks height algo
       const meowpowHashrate = await rpc("getnetworkhashps 0 -1 0");
       const scryptHashrate = await rpc("getnetworkhashps 0 -1 1");
 
+      // Fetch recent blocks for block time analysis
+      const blocks = [];
+      const startHeight = Math.max(0, blockHeight - blocksToFetch + 1);
+      
+      for (let height = startHeight; height <= blockHeight; height++) {
+        try {
+          const hash = await rpc(`getblockhash ${height}`);
+          const block = await rpc(`getblock ${hash} 1`);
+          
+          if (block && block.time && block.version !== undefined) {
+            blocks.push({
+              height: height,
+              time: block.time,
+              version: block.version
+            });
+          }
+        } catch (err) {
+          // Skip blocks that fail to fetch
+          log(`Failed to fetch block ${height}: ${err.message}`, "warn");
+        }
+      }
+      
+      // Calculate block statistics
+      const blockStats = calculateBlockStats(blocks, windowMinutes);
+
       return {
         block_height: blockHeight,
+        window_minutes: windowMinutes,
         meowpow: {
           difficulty: meowpowDifficulty,
-          hashrate: meowpowHashrate
+          hashrate: meowpowHashrate,
+          blocks_found: blockStats.meowpow.blocks_found,
+          avg_block_time: blockStats.meowpow.avg_block_time
         },
         scrypt: {
           difficulty: scryptDifficulty,
-          hashrate: scryptHashrate
+          hashrate: scryptHashrate,
+          blocks_found: blockStats.scrypt.blocks_found,
+          avg_block_time: blockStats.scrypt.avg_block_time
         }
       };
     });

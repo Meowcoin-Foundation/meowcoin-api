@@ -81,20 +81,25 @@ Static reward percentages used for all blocks.
 
 ### **GET `/mining-info`**
 
-Returns mining information including block height, difficulty, and network hash rate for both MeowPow and Scrypt algorithms.
+Returns mining information including block height, difficulty, network hash rate, average block time, and block counts for both MeowPow and Scrypt algorithms. Analyzes blocks from the last 60 minutes.
 
 **Example Response**
 
 ```json
 {
   "block_height": 1672942,
+  "window_minutes": 60,
   "meowpow": {
     "difficulty": 1234.567,
-    "hashrate": 1234567890.123
+    "hashrate": 1234567890.123,
+    "blocks_found": 22,
+    "avg_block_time": 125
   },
   "scrypt": {
     "difficulty": 5678.901,
-    "hashrate": 9876543210.987
+    "hashrate": 9876543210.987,
+    "blocks_found": 19,
+    "avg_block_time": 181
   }
 }
 ```
