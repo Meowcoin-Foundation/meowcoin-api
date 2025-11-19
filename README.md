@@ -8,6 +8,11 @@ A lightweight REST API providing real-time Meowcoin blockchain metrics, includin
 https://api.mewccrypto.com
 ```
 
+**API Documentation:**
+
+- Interactive Swagger UI: `https://api.mewccrypto.com/docs`
+- OpenAPI JSON Spec: `https://api.mewccrypto.com/docs.json`
+
 This API is maintained by the **Meowcoin Foundation** and serves as the official source for supply data and reward calculations.
 
 ---

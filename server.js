@@ -1,5 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
+import swaggerJsdoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
 import { rpc } from "./rpc.js";
 import { Cache, isCacheValid } from "./cache.js";
 import { log, shouldLog } from "./utils.js";
@@ -29,6 +32,75 @@ function getBlockSubsidy(height) {
   
   return INITIAL_SUBSIDY / Math.pow(2, halvings);
 }
+
+// Swagger/OpenAPI configuration
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Meowcoin Public API",
+      version: "1.0.0",
+      description: "A production-ready REST API service for querying Meowcoin blockchain data including supply metrics, block rewards, mining information, and network statistics.",
+      contact: {
+        name: "Meowcoin Foundation",
+      },
+      license: {
+        name: "MIT",
+      },
+    },
+    servers: [
+      {
+        url: "https://api.mewccrypto.com",
+        description: "Production server",
+      },
+      {
+        url: `http://localhost:${PORT}`,
+        description: "Local development server",
+      },
+    ],
+    tags: [
+      {
+        name: "Supply",
+        description: "Supply-related endpoints",
+      },
+      {
+        name: "Rewards",
+        description: "Block reward and subsidy endpoints",
+      },
+      {
+        name: "Mining",
+        description: "Mining statistics and network information",
+      },
+      {
+        name: "Health",
+        description: "Health check endpoints",
+      },
+    ],
+  },
+  apis: ["./server.js"], // Path to the API files
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
+// Swagger UI endpoint
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: ".swagger-ui .topbar { display: none }",
+  customSiteTitle: "Meowcoin API Documentation",
+}));
+
+// Swagger JSON endpoint
+app.get("/docs.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
+
+// CORS middleware - allow all origins for public API
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: false
+}));
 
 // Middleware
 app.use(express.json());
@@ -86,8 +158,35 @@ async function cachedFetch(key, fn) {
 // ==================== ENDPOINTS ====================
 
 /**
- * GET /total-supply
- * Returns the current total supply
+ * @swagger
+ * /total-supply:
+ *   get:
+ *     summary: Get total supply
+ *     description: Returns the current total supply of Meowcoin based on the UTXO set
+ *     tags: [Supply]
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total_supply:
+ *                   type: number
+ *                   example: 8361822924.945867
+ *                   description: Total supply in MEWC
+ *       503:
+ *         description: Service temporarily unavailable
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                 message:
+ *                   type: string
  */
 app.get("/total-supply", async (req, res) => {
   try {
@@ -110,8 +209,26 @@ app.get("/total-supply", async (req, res) => {
 });
 
 /**
- * GET /circulating-supply
- * Returns the current circulating supply
+ * @swagger
+ * /circulating-supply:
+ *   get:
+ *     summary: Get circulating supply
+ *     description: Returns the current circulating supply of Meowcoin. Meowcoin has no premine or locked team allocation, so circulating supply equals mined supply minus burns.
+ *     tags: [Supply]
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 circulating_supply:
+ *                   type: number
+ *                   example: 8361822924.945867
+ *                   description: Circulating supply in MEWC
+ *       503:
+ *         description: Service temporarily unavailable
  */
 app.get("/circulating-supply", async (req, res) => {
   try {
@@ -134,8 +251,37 @@ app.get("/circulating-supply", async (req, res) => {
 });
 
 /**
- * GET /block-reward
- * Returns the current block reward and breakdown (consensus-derived subsidy)
+ * @swagger
+ * /block-reward:
+ *   get:
+ *     summary: Get current block reward
+ *     description: Returns the current block subsidy and reward split (60% miner, 40% foundation). Uses consensus-derived subsidy calculation.
+ *     tags: [Rewards]
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 height:
+ *                   type: integer
+ *                   example: 1672942
+ *                 block_reward:
+ *                   type: number
+ *                   example: 5000
+ *                   description: Total block subsidy in MEWC
+ *                 miner_reward:
+ *                   type: number
+ *                   example: 3000
+ *                   description: Miner reward (60%) in MEWC
+ *                 foundation_reward:
+ *                   type: number
+ *                   example: 2000
+ *                   description: Foundation reward (40%) in MEWC
+ *       503:
+ *         description: Service temporarily unavailable
  */
 app.get("/block-reward", async (req, res) => {
   try {
@@ -174,8 +320,40 @@ app.get("/block-reward", async (req, res) => {
 });
 
 /**
- * GET /reward-breakdown
- * Returns detailed reward breakdown with percentages (consensus-derived subsidy)
+ * @swagger
+ * /reward-breakdown:
+ *   get:
+ *     summary: Get detailed reward breakdown
+ *     description: Returns detailed reward breakdown with percentages for the current block
+ *     tags: [Rewards]
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 height:
+ *                   type: integer
+ *                   example: 1672942
+ *                 subsidy_total:
+ *                   type: number
+ *                   example: 5000
+ *                 miner_percentage:
+ *                   type: integer
+ *                   example: 60
+ *                 foundation_percentage:
+ *                   type: integer
+ *                   example: 40
+ *                 miner_reward:
+ *                   type: number
+ *                   example: 3000
+ *                 foundation_reward:
+ *                   type: number
+ *                   example: 2000
+ *       503:
+ *         description: Service temporarily unavailable
  */
 app.get("/reward-breakdown", async (req, res) => {
   try {
@@ -290,9 +468,65 @@ function calculateBlockStats(blocks, windowMinutes) {
 }
 
 /**
- * GET /mining-info
- * Returns mining information for both algorithms (MeowPow and Scrypt)
- * Analyzes blocks from the last 60 minutes
+ * @swagger
+ * /mining-info:
+ *   get:
+ *     summary: Get mining information
+ *     description: Returns mining information including block height, difficulty, network hash rate, average block time, and block counts for both MeowPow and Scrypt algorithms. Analyzes blocks from the last 60 minutes.
+ *     tags: [Mining]
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 block_height:
+ *                   type: integer
+ *                   example: 1672942
+ *                 window_minutes:
+ *                   type: integer
+ *                   example: 60
+ *                   description: Time window analyzed in minutes
+ *                 meowpow:
+ *                   type: object
+ *                   properties:
+ *                     difficulty:
+ *                       type: number
+ *                       example: 695.79
+ *                     hashrate:
+ *                       type: number
+ *                       example: 16520849211.44
+ *                     blocks_found:
+ *                       type: integer
+ *                       example: 22
+ *                       description: Number of MeowPow blocks found in the window
+ *                     avg_block_time:
+ *                       type: integer
+ *                       nullable: true
+ *                       example: 125
+ *                       description: Average time between MeowPow blocks in seconds
+ *                 scrypt:
+ *                   type: object
+ *                   properties:
+ *                     difficulty:
+ *                       type: number
+ *                       example: 5917.16
+ *                     hashrate:
+ *                       type: number
+ *                       example: 338176091462.52
+ *                     blocks_found:
+ *                       type: integer
+ *                       example: 19
+ *                       description: Number of Scrypt blocks found in the window
+ *                     avg_block_time:
+ *                       type: integer
+ *                       nullable: true
+ *                       example: 181
+ *                       description: Average time between Scrypt blocks in seconds
+ *       503:
+ *         description: Service temporarily unavailable
  */
 app.get("/mining-info", async (req, res) => {
   try {
@@ -365,8 +599,47 @@ app.get("/mining-info", async (req, res) => {
 });
 
 /**
- * GET /health
- * Health check endpoint
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check
+ *     description: Returns API health status and RPC connectivity information
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "ok"
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2024-01-01T00:00:00.000Z"
+ *                 cache_age_ms:
+ *                   type: integer
+ *                   example: 12345
+ *                   description: Age of cache in milliseconds
+ *       503:
+ *         description: Service is degraded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: "degraded"
+ *                 error:
+ *                   type: string
+ *                   example: "RPC connection failed"
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
  */
 app.get("/health", async (req, res) => {
   try {
