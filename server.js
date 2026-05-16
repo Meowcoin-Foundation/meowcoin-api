@@ -191,7 +191,7 @@ async function cachedFetch(key, fn) {
 app.get("/total-supply", async (req, res) => {
   try {
     const supply = await cachedFetch("total_supply", async () => {
-      const info = await rpc("gettxoutsetinfo");
+      const info = await rpc("gettxoutsetinfo", []);
       if (!info || typeof info.total_amount === "undefined") {
         throw new Error("Invalid response from gettxoutsetinfo");
       }
@@ -233,7 +233,7 @@ app.get("/total-supply", async (req, res) => {
 app.get("/circulating-supply", async (req, res) => {
   try {
     const circ = await cachedFetch("circulating_supply", async () => {
-      const info = await rpc("gettxoutsetinfo");
+      const info = await rpc("gettxoutsetinfo", []);
       if (!info || typeof info.total_amount === "undefined") {
         throw new Error("Invalid response from gettxoutsetinfo");
       }
@@ -286,7 +286,7 @@ app.get("/circulating-supply", async (req, res) => {
 app.get("/block-reward", async (req, res) => {
   try {
     const data = await cachedFetch("block_reward", async () => {
-      const chain = await rpc("getblockchaininfo");
+      const chain = await rpc("getblockchaininfo", []);
       if (!chain || typeof chain.blocks === "undefined") {
         throw new Error("Invalid response from getblockchaininfo");
       }
@@ -358,7 +358,7 @@ app.get("/block-reward", async (req, res) => {
 app.get("/reward-breakdown", async (req, res) => {
   try {
     const data = await cachedFetch("reward_breakdown", async () => {
-      const chain = await rpc("getblockchaininfo");
+      const chain = await rpc("getblockchaininfo", []);
       if (!chain || typeof chain.blocks === "undefined") {
         throw new Error("Invalid response from getblockchaininfo");
       }
@@ -535,24 +535,24 @@ app.get("/mining-info", async (req, res) => {
     
     const data = await cachedFetch("mining_info", async () => {
       // Get block height
-      const blockHeight = await rpc("getblockcount");
-      
+      const blockHeight = await rpc("getblockcount", []);
+
       // Get difficulty for both algorithms
-      const meowpowDifficulty = await rpc("getdifficulty 0");
-      const scryptDifficulty = await rpc("getdifficulty 1");
-      
+      const meowpowDifficulty = await rpc("getdifficulty", ["meowpow"]);
+      const scryptDifficulty = await rpc("getdifficulty", ["scrypt"]);
+
       // Get network hash rate for both algorithms
-      const meowpowHashrate = await rpc("getnetworkhashps 0 -1 0");
-      const scryptHashrate = await rpc("getnetworkhashps 0 -1 1");
+      const meowpowHashrate = await rpc("getnetworkhashps", [120, -1, "meowpow"]);
+      const scryptHashrate = await rpc("getnetworkhashps", [120, -1, "scrypt"]);
 
       // Fetch recent blocks for block time analysis
       const blocks = [];
       const startHeight = Math.max(0, blockHeight - blocksToFetch + 1);
-      
+
       for (let height = startHeight; height <= blockHeight; height++) {
         try {
-          const hash = await rpc(`getblockhash ${height}`);
-          const block = await rpc(`getblock ${hash} 1`);
+          const hash = await rpc("getblockhash", [height]);
+          const block = await rpc("getblock", [hash, 1]);
           
           if (block && block.time && block.version !== undefined) {
             blocks.push({
@@ -644,7 +644,7 @@ app.get("/mining-info", async (req, res) => {
 app.get("/health", async (req, res) => {
   try {
     // Quick RPC check to verify connectivity
-    await rpc("getblockcount");
+    await rpc("getblockcount", []);
     res.json({ 
       status: "ok",
       timestamp: new Date().toISOString(),

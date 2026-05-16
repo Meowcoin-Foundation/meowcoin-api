@@ -10,34 +10,17 @@ const RPC_PASS = process.env.RPC_PASS;
 const RPC_URL = `http://${RPC_HOST}:${RPC_PORT}`;
 
 /**
- * Parse command string into method and params
- * Examples:
- *   "gettxoutsetinfo" -> { method: "gettxoutsetinfo", params: [] }
- *   "getblockchaininfo" -> { method: "getblockchaininfo", params: [] }
- */
-function parseCommand(cmd) {
-  const parts = cmd.trim().split(/\s+/);
-  const method = parts[0];
-  const params = parts.slice(1).map(p => {
-    // Try to parse as number, otherwise keep as string
-    const num = Number(p);
-    return isNaN(num) ? p : num;
-  });
-  return { method, params };
-}
-
-/**
  * Execute a JSON-RPC call to Meowcoin Core
- * @param {string} cmd - RPC command (e.g., "gettxoutsetinfo")
+ * @param {string} method - RPC method name (e.g., "gettxoutsetinfo")
+ * @param {Array} params - RPC parameters array
  * @returns {Promise<any>} Parsed JSON result
  * @throws {Error} If RPC call fails
  */
-export async function rpc(cmd) {
+export async function rpc(method, params = []) {
   if (!RPC_USER || !RPC_PASS) {
     throw new Error("RPC_USER and RPC_PASS must be set in environment variables");
   }
 
-  const { method, params } = parseCommand(cmd);
   
   const auth = Buffer.from(`${RPC_USER}:${RPC_PASS}`).toString("base64");
 
@@ -69,8 +52,8 @@ export async function rpc(cmd) {
 
     return data.result;
   } catch (err) {
-    console.error(`RPC Error [${cmd}]:`, err.message);
-    throw new Error(`RPC command failed: ${cmd} - ${err.message}`);
+    console.error(`RPC Error [${method}]:`, err.message);
+    throw new Error(`RPC command failed: ${method} - ${err.message}`);
   }
 }
 
