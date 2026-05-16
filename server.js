@@ -17,6 +17,18 @@ const TTL = parseInt(process.env.CACHE_TTL_MS || 60000, 10);
 const INITIAL_SUBSIDY = 5000;        // MEWC
 const HALVING_INTERVAL = 2100000;   // blocks (~4 years @ 1 min blocks)
 
+// MeowPow DAG parameters
+const DAG_EPOCH_LENGTH = 7500;       // blocks per epoch
+const DAG_BASE_GIB = 1;             // GiB at epoch 0
+const DAG_GROWTH_GIB = 0.03125;     // GiB added per epoch (1/32)
+
+function getDagInfo(height) {
+  const epoch = Math.floor(height / DAG_EPOCH_LENGTH);
+  const dag_size_gib = DAG_BASE_GIB + epoch * DAG_GROWTH_GIB;
+  const blocks_until_next_epoch = DAG_EPOCH_LENGTH - (height % DAG_EPOCH_LENGTH);
+  return { epoch, dag_size_gib, blocks_until_next_epoch };
+}
+
 /**
  * Calculate block subsidy based on consensus rules
  * @param {number} height - Block height
@@ -594,6 +606,59 @@ app.get("/mining-info", async (req, res) => {
     res.status(503).json({ 
       error: "Service temporarily unavailable",
       message: "Unable to fetch mining information"
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /dag-info:
+ *   get:
+ *     summary: Get MeowPow DAG information
+ *     description: Returns the current MeowPow DAG epoch and estimated DAG size. Formula — DAG_GiB = 1 + floor(height / 7500) × 0.03125
+ *     tags: [Mining]
+ *     responses:
+ *       200:
+ *         description: Successful response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 block_height:
+ *                   type: integer
+ *                   example: 1789208
+ *                 epoch:
+ *                   type: integer
+ *                   example: 238
+ *                   description: Current DAG epoch (block_height / 7500, floored)
+ *                 dag_size_gib:
+ *                   type: number
+ *                   example: 8.4375
+ *                   description: Estimated DAG size in GiB
+ *                 blocks_until_next_epoch:
+ *                   type: integer
+ *                   example: 292
+ *                   description: Blocks remaining until the next epoch transition
+ *       503:
+ *         description: Service temporarily unavailable
+ */
+app.get("/dag-info", async (req, res) => {
+  try {
+    const data = await cachedFetch("dag_info", async () => {
+      const height = await rpc("getblockcount", []);
+      if (typeof height !== "number") {
+        throw new Error("Invalid response from getblockcount");
+      }
+      return { block_height: height, ...getDagInfo(height) };
+    });
+
+    res.json(data);
+  } catch (err) {
+    log(`Error in /dag-info: ${err.message}`, "error");
+    res.status(503).json({
+      error: "Service temporarily unavailable",
+      message: "Unable to fetch DAG info"
     });
   }
 });
